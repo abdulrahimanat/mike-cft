@@ -1,0 +1,727 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Creates a VPC with new CIDR block, Public,Private, MLBA, DMZ subnets, NATs, Internet Gateway, route tables, VPC endpoint'
+
+Parameters:
+
+  Environment:
+    Type: String
+    AllowedValues: 
+      - Development
+      - Production
+    Default: Development
+  TagOwner:
+    Type: String
+    Description: Enter Owner Name/Email.
+    Default: 'loews.com'
+
+  TagApplication:
+    Type: String
+    Description: Enter Application Name.
+    Default: 'Moodys Issuers Portal'
+  
+  TagProject:
+    Type: String
+    Description: Enter Project Name.
+    Default: 'iport'
+
+
+Mappings:
+  Environments:
+    Development:
+      VpcCIDR: 10.15.0.0/16
+      PublicSubnet1CIDR: 10.15.0.0/24
+      PublicSubnet2CIDR: 10.15.1.0/24
+      PrivateSubnet1CIDR: 10.15.2.0/24
+      PrivateSubnet2CIDR: 10.15.3.0/24
+      MlbaSubnet1CIDR: 10.15.4.0/24
+      MlbaSubnet2CIDR: 10.15.5.0/24
+      DmzSubnet1CIDR: 10.15.6.0/24
+      DmzSubnet2CIDR: 10.15.7.0/24
+    Production:
+      VpcCIDR: 10.16.0.0/16
+      PublicSubnet1CIDR: 10.16.0.0/24
+      PublicSubnet2CIDR: 10.16.1.0/24
+      PrivateSubnet1CIDR: 10.16.2.0/24
+      PrivateSubnet2CIDR: 10.16.3.0/24
+      MlbaSubnet1CIDR: 10.16.4.0/24
+      MlbaSubnet2CIDR: 10.16.5.0/24
+      DmzSubnet1CIDR: 10.16.6.0/24
+      DmzSubnet2CIDR: 10.16.7.0/24
+
+
+Resources:
+# VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [Environments, !Ref Environment, VpcCIDR]
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-VPC'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+# Internet Gateway
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-IGW'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  GatewayToInternet:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+# NAT Gateway
+
+  NATGateway:
+   Type: AWS::EC2::NatGateway
+   Properties:
+     AllocationId: !GetAtt ElasticIPAddress.AllocationId
+     SubnetId: !Ref PublicSubnet1
+     Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-NAT'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+  ElasticIPAddress:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: VPC
+  
+#Public Subnets 
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !FindInMap [Environments, !Ref Environment, PublicSubnet1CIDR ]
+      MapPublicIpOnLaunch: true
+
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Public-subnet-AZ1'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !FindInMap [Environments, !Ref Environment, PublicSubnet2CIDR ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Public-subnet-AZ2'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+
+# Private Subnet 
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !FindInMap [Environments, !Ref Environment, PrivateSubnet1CIDR ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Private-subnet-AZ1'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !FindInMap [Environments, !Ref Environment, PrivateSubnet2CIDR ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Private-subnet-AZ2'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+
+# DMZ Subnet AZs
+  DmzSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !FindInMap [Environments, !Ref Environment, DmzSubnet1CIDR ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Dmz-subnet-AZ1'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  DmzSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !FindInMap [Environments, !Ref Environment, DmzSubnet2CIDR ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Dmz-subnet-AZ2'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+
+
+# MLBA Subnets
+  MlbaSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !FindInMap [Environments, !Ref Environment, MlbaSubnet1CIDR ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Mlba-subnet-AZ1'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  MlbaSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !FindInMap [Environments, !Ref Environment, MlbaSubnet2CIDR ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Mlba-subnet-AZ2'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+
+
+# Public route table assocation
+  PublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Public-routes-AZ1'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      SubnetId: !Ref PublicSubnet1
+  
+  PublicRoute1:
+    Type: 'AWS::EC2::Route'
+    DependsOn: GatewayToInternet
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+
+  PublicRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Public-routes-AZ2'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable2
+      SubnetId: !Ref PublicSubnet2
+
+  PublicRoute2:
+    Type: 'AWS::EC2::Route'
+    DependsOn: GatewayToInternet
+    Properties:
+      RouteTableId: !Ref PublicRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+
+# Private route table assocation
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Private-routes-AZ1'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  # Private route table can access web via NAT (created below)
+  PrivateRoute1:            
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Private-routes-AZ2'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+  
+  PrivateRoute2:            
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+
+
+
+# DMZ route table assocation
+  DmzRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Dmz-routes-AZ1'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  DmzSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DmzRouteTable1
+      SubnetId: !Ref DmzSubnet1
+
+  DmzRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Dmz-routes-AZ2'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  DmzSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DmzRouteTable2
+      SubnetId: !Ref DmzSubnet2
+
+
+
+# MLBA route table assocation
+  MlbaRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Mlba-routes-AZ1'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+  MlbaSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref MlbaRouteTable1
+      SubnetId: !Ref MlbaSubnet1
+
+  MlbaRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        -
+          Key: Name
+          Value: !Join
+                 - '-'
+                 - - !Ref TagProject
+                   - !Sub '${Environment}-Mlba-routes-AZ2'
+        -
+          Key: Owner
+          Value: !Ref TagOwner
+        -
+          Key: Environment
+          Value: !Ref Environment
+        -
+          Key: Application
+          Value: !Ref TagApplication
+        -
+          Key: Project
+          Value: !Ref TagProject
+
+
+  MlbaSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref MlbaRouteTable2
+      SubnetId: !Ref MlbaSubnet2
+
+
+# Create VPC Endpoint for S3
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Statement:
+          Action: "*"
+          Effect: Allow
+          Resource: "*"
+          Principal: "*"
+      RouteTableIds: 
+      - !Ref PublicRouteTable1
+      - !Ref PublicRouteTable2
+      - !Ref PrivateRouteTable1
+      - !Ref PrivateRouteTable2
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref VPC
+
+
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+
+  VPCCIDR:
+    Description: A reference for the VPC CIDR block.
+    Value: !GetAtt VPC.CidrBlock
+
+  PublicSubnet1:
+    Description: A reference to the Public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+
+  PublicSubnet2:
+    Description: A reference to the Public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+
+  PrivateSubnet1:
+    Description: A reference to the Private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+
+  PrivateSubnet2:
+    Description: A reference to the Private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+  
+  DmzSubnet1:
+    Description: A reference to the Dmz subnet in the 1st Availability Zone
+    Value: !Ref DmzSubnet1
+
+  DmzSubnet2:
+    Description: A reference to the Dmz subnet in the 2nd Availability Zone
+    Value: !Ref DmzSubnet2
+
+  MlbaSubnet1:
+    Description: A reference to the Mlba subnet in the 1st Availability Zone
+    Value: !Ref MlbaSubnet1
+
+  MlbaSubnet2:
+    Description: A reference to the Mlba subnet in the 2nd Availability Zone
+    Value: !Ref MlbaSubnet2
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
